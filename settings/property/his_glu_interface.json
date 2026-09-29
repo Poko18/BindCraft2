@@ -1,0 +1,16 @@
+{
+  "description": "Reward at least one histidine-glutamate pair across the binder-target interface",
+  "weights_interface_residue_pair": 1.0,
+  "losses": {
+    "interface_residue_pair": {
+      "params": {
+        "binder_residue": "H",
+        "target_residue": "E",
+        "pairs": 1.0,
+        "distance": 6.0,
+        "sigma": 1.5,
+        "symmetric": true
+      }
+    }
+  }
+}

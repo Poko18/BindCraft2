@@ -272,6 +272,7 @@ The table lists every objective. Default weights describe the standard binder be
 | `weights_exposed_termini` | off | Exposure of the ends of each binder chain. |
 | `weights_binder_pae` | 0.4 | Confidence in relative positions within the binder. |
 | `weights_interface_pae` | 0.1 | Confidence in the binder–target pose. |
+| `weights_interface_residue_pair` | off | Charge for every requested cross-interface residue pair left unmade. Defaults to one histidine–glutamate pair in either direction; `binder_residue`, `target_residue`, `symmetric` and `pairs` set which and how many. |
 | `weights_compactness` | 0.5 | Binder radius of gyration relative to a globular protein of its length. |
 | `weights_iptm_loss` | 0.05 | Interface confidence for binding targets. |
 | `weights_ptm_loss` | off | Confidence in the entire complex as one structure. |
