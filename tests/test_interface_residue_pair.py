@@ -14,7 +14,7 @@ def binder_target_complex(binder_letters, gap, target_letters):
     target = chain(target_letters, [[gap, 0.0, 0.0], [gap, 0.0, 40.0]], [0, 0])
     return {'binder': binder, 'target': target}
 
-def score(binder_letters, gap=6.0, target_letters='EA', **parameters):
+def score(binder_letters, gap=7.8, target_letters='DA', **parameters):
     protein_complex = binder_target_complex(binder_letters, gap, target_letters)
     return float(interface_residue_pair_loss({'complex': protein_complex}, {'complex': StructurePrediction(protein_complex, {})}, **parameters))
 
@@ -28,7 +28,7 @@ def test_either_direction_counts():
 
 def test_missing_or_distant_partner_is_charged():
     assert score('AA') > 0.9
-    assert score('HA', gap=14.0) > 0.9
+    assert score('HA', gap=16.0) > 0.9
 
 def test_requested_pair_count_saturates():
     assert score('HA', pairs=2.0) > score('HA')
@@ -44,3 +44,22 @@ def test_gradient_points_at_the_contacting_residue():
     gradient = jax.grad(logit_loss)(jnp.zeros((2, len(AMINO_ACIDS))))
     assert gradient[0, AMINO_ACIDS.index('H')] < 0
     assert gradient[1, AMINO_ACIDS.index('H')] > -1e-09
+
+
+def test_either_carboxylate_counts():
+    assert score('HA', target_letters='DA') < 0.05
+    assert score('HA', target_letters='EA') < 0.05
+    assert score('HA', target_letters='AA') > 0.9
+
+def test_a_group_is_the_sum_of_its_partners():
+    both = binder_target_complex('HA', 7.8, 'DA')
+    one = float(interface_residue_pair_loss({'complex': both}, {'complex': StructurePrediction(both, {})}, target_residue='D'))
+    grouped = float(interface_residue_pair_loss({'complex': both}, {'complex': StructurePrediction(both, {})}, target_residue='DE'))
+    assert grouped <= one + 1e-06
+
+def test_an_unknown_partner_is_refused():
+    import pytest
+    with pytest.raises(ValueError):
+        score('HA', target_residue='DZ')
+    with pytest.raises(ValueError):
+        score('HA', target_residue='')

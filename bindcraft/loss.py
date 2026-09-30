@@ -656,8 +656,19 @@ def disulfide_loss(protein_states: ProteinStates, predictions: StructurePredicti
     satisfaction = (partner_bond * mutual_pair_choice(partner_bond, temperature)).sum(-1)
     return hardness * jnp.sum(cysteine_probability * jax.nn.relu(1 - satisfaction) * residue_mask)
 
+def residue_group_probability(sequence: Array, residues: str) -> Array:
+    """Total probability of any residue in the group, so one side can name several.
+
+    A pH switch pairs a histidine with either carboxylate, and aspartate and
+    glutamate are the same chemistry, so scoring only one of them ignores most
+    of the partners a target offers."""
+    unknown = ''.join(sorted(set(residues) - set(AMINO_ACIDS)))
+    if unknown or not residues:
+        raise ValueError(f'interface_residue_pair reads {residues!r}; write each partner as an uppercase one-letter code, as in "DE"')
+    return sum(sequence[:, AMINO_ACIDS.index(residue)] for residue in dict.fromkeys(residues))
+
 @loss('interface_residue_pair', target_weighting='binds_target')
-def interface_residue_pair_loss(protein_states: ProteinStates, predictions: StructurePredictions, prediction_state: str='complex', binder: str='binder', target: str='target', binder_residue: str='H', target_residue: str='E', pairs: float=1.0, distance: float=6.0, sigma: float=1.5, symmetric: bool=True, hotspots_only: bool=False, designed_only: bool=True) -> Array:
+def interface_residue_pair_loss(protein_states: ProteinStates, predictions: StructurePredictions, prediction_state: str='complex', binder: str='binder', target: str='target', binder_residue: str='H', target_residue: str='DE', pairs: float=1.0, distance: float=7.8, sigma: float=1.5, symmetric: bool=True, hotspots_only: bool=False, designed_only: bool=True) -> Array:
     prediction_state = resolve_prediction_state(predictions, prediction_state)
     protein_complex = protein_states[prediction_state]
     target = resolve_target_chain(protein_complex, target, prediction_state)
@@ -672,9 +683,9 @@ def interface_residue_pair_loss(protein_states: ProteinStates, predictions: Stru
     binder_coordinates = jnp.concatenate([chain_atom_coordinates(predictions[prediction_state].protein_complex[name], 'CB')[0] for name in binder_chains])
     target_coordinates = chain_atom_coordinates(predictions[prediction_state].protein_complex[target], 'CB')[0]
     bond_quality = jnp.exp(-jnp.square((pairwise_atom_distances(binder_coordinates, target_coordinates) - distance) / sigma)) * binder_mask[:, None] * target_mask[None, :]
-    partner = binder_sequence[:, AMINO_ACIDS.index(binder_residue)][:, None] * target_sequence[:, AMINO_ACIDS.index(target_residue)][None, :]
+    partner = residue_group_probability(binder_sequence, binder_residue)[:, None] * residue_group_probability(target_sequence, target_residue)[None, :]
     if symmetric:
-        partner = partner + binder_sequence[:, AMINO_ACIDS.index(target_residue)][:, None] * target_sequence[:, AMINO_ACIDS.index(binder_residue)][None, :]
+        partner = partner + residue_group_probability(binder_sequence, target_residue)[:, None] * residue_group_probability(target_sequence, binder_residue)[None, :]
     hardness = _masked_mean(jnp.max(binder_sequence, axis=-1), binder_mask)
     return hardness * jax.nn.relu(pairs - jnp.sum(partner * bond_quality))
 
