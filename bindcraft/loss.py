@@ -656,6 +656,28 @@ def disulfide_loss(protein_states: ProteinStates, predictions: StructurePredicti
     satisfaction = (partner_bond * mutual_pair_choice(partner_bond, temperature)).sum(-1)
     return hardness * jnp.sum(cysteine_probability * jax.nn.relu(1 - satisfaction) * residue_mask)
 
+@loss('interface_residue_pair', target_weighting='binds_target')
+def interface_residue_pair_loss(protein_states: ProteinStates, predictions: StructurePredictions, prediction_state: str='complex', binder: str='binder', target: str='target', binder_residue: str='H', target_residue: str='E', pairs: float=1.0, distance: float=6.0, sigma: float=1.5, symmetric: bool=True, hotspots_only: bool=False, designed_only: bool=True) -> Array:
+    prediction_state = resolve_prediction_state(predictions, prediction_state)
+    protein_complex = protein_states[prediction_state]
+    target = resolve_target_chain(protein_complex, target, prediction_state)
+    binder_chains = binder_copy_chains(protein_complex, binder)
+    binder_sequence = jnp.concatenate([amino_acid_probabilities(protein_complex[name].sequence) for name in binder_chains])
+    binder_mask = jnp.concatenate([real_residue_mask(protein_complex[name].flags) & (has_residue_flag(protein_complex[name].flags, ResidueFlags.DESIGN) | (not designed_only)) for name in binder_chains])
+    target_flags = protein_complex[target].flags
+    target_sequence = jax.lax.stop_gradient(amino_acid_probabilities(protein_complex[target].sequence))
+    target_mask = real_residue_mask(target_flags)
+    if hotspots_only:
+        target_mask = target_mask & jnp.where(has_residue_flag(target_flags, ResidueFlags.HOTSPOT).any(), has_residue_flag(target_flags, ResidueFlags.HOTSPOT), True)
+    binder_coordinates = jnp.concatenate([chain_atom_coordinates(predictions[prediction_state].protein_complex[name], 'CB')[0] for name in binder_chains])
+    target_coordinates = chain_atom_coordinates(predictions[prediction_state].protein_complex[target], 'CB')[0]
+    bond_quality = jnp.exp(-jnp.square((pairwise_atom_distances(binder_coordinates, target_coordinates) - distance) / sigma)) * binder_mask[:, None] * target_mask[None, :]
+    partner = binder_sequence[:, AMINO_ACIDS.index(binder_residue)][:, None] * target_sequence[:, AMINO_ACIDS.index(target_residue)][None, :]
+    if symmetric:
+        partner = partner + binder_sequence[:, AMINO_ACIDS.index(target_residue)][:, None] * target_sequence[:, AMINO_ACIDS.index(binder_residue)][None, :]
+    hardness = _masked_mean(jnp.max(binder_sequence, axis=-1), binder_mask)
+    return hardness * jax.nn.relu(pairs - jnp.sum(partner * bond_quality))
+
 def align_binder_coordinates(coordinates: Array, reference_coordinates: Array, valid_mask: Array) -> Array:
     rotation, center, reference_center = kabsch(coordinates, reference_coordinates, valid_mask)
     return alignment_matrix_product(coordinates - center, jax.lax.stop_gradient(rotation).T) + reference_center

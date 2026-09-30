@@ -285,6 +285,7 @@
     "weights_induced_fit_interface": null,
     "weights_interface_contacts": 1.0,
     "weights_interface_pae": 0.1,
+    "weights_interface_residue_pair": null,
     "weights_iptm_loss": 0.05,
     "weights_multidomain": null,
     "weights_n_terminus_away": null,

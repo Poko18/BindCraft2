@@ -16,6 +16,7 @@ rarer** — add only what your experiment needs. The overall roles:
 | `forced_targeting` | contact concentrated on the declared hotspots | ≥50% of hotspots contacted |
 | `humanize` | humanized sequence (*planned*) + low predicted MHC anchor load | MHC anchor score under its ceiling |
 | `disulfide_staple` | a geometrically valid disulfide (cysteine allowed) | ≥1 disulfide formed |
+| `his_glu_interface` | a histidine–glutamate pair across the interface | *no filter — count the pairs yourself* |
 | `protease_stable` | fewer protease-cleavage motifs, buried loops and termini | protease-site / exposed-loop / terminus-exposure scores under their ceilings |
 | `termini_accessible` | both chain ends angled away from the target | termini-away angle clears its floor |
 | `termini_together` | N and C termini within ~7 Å | termini distance under ~10 Å |
@@ -60,6 +61,17 @@ a stapled mini-binder — a chemistry route to rigidity and an alternative to a 
 `cyclic_peptide`. *Caveat:* it rewards a **plausible** disulfide geometry, not a verified bond; the
 protein still has to fold and oxidise correctly, and disulfides won't survive a reducing (e.g.
 intracellular) environment.
+
+**`his_glu_interface` — a chosen residue pair across the interface.** It rewards a histidine on one
+side of the interface sitting ~6 Å (Cβ–Cβ) from a glutamate on the other, in either direction, and stops
+paying once the requested number of pairs is made — an uncapped reward would tile the interface with the
+two residues. `binder_residue` and `target_residue` change which pair, so the same objective covers
+Arg–Asp and the other charged pairs; `pairs` sets how many. The residues survive ProteinMPNN because
+`redesign_interface` defaults to false, which holds the interface fixed during redesign — turn it on and
+they go back into the pool. *Caveat:* this is **geometry, not chemistry**. It knows nothing about
+protonation state or whether the imidazole points at the carboxylate, and Cβ is used precisely because a
+hallucinated sequence has no trustworthy rotamers. It also ships **without a filter**, so it enriches the
+run rather than guaranteeing any one design — check the accepted structures before believing it worked.
 
 **`termini_accessible` / `termini_together` — chain-end geometry.** The first angles both the N and C
 termini *away* from the target, so a fusion partner, tag or immobilisation chemistry can be attached
